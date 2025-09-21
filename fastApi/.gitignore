@@ -1,6 +1,4 @@
 # Ignorar arquivos de ambiente
-.env
-
 # Ignorar pastas do Python
 __pycache__/
 venv/
