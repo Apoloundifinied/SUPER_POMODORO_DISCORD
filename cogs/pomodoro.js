@@ -11,35 +11,74 @@ const {
 } = require('discord.js');
 const fs = require('fs/promises');
 const fetch = require('node-fetch');
-const { addPontos, getPontos } = require('./utils/pontos');
+const { addPontos } = require('./utils/pontos');
 
 const POMODORO_FILE = './pomodoros.json';
-const UPDATE_INTERVAL = 30 * 1000; // Update every 30 seconds
+const COMPLETED_FILE = './pomodoros_concluidos.json';
+const UPDATE_INTERVAL = 30 * 1000; // 30 segundos
+const QUOTE_API_URL = process.env.QUOTE_API_URL || 'http://127.0.0.1:8000/frases';
+
+const intervals = new Map();
+let savingPomodoros = false;
+let savingCompleted = false;
+
+// ---- Funções auxiliares ----
 
 async function loadPomodoros() {
     try {
         const data = await fs.readFile(POMODORO_FILE, 'utf8');
-        return JSON.parse(data);
-    } catch {
+        const parsed = JSON.parse(data);
+        if (typeof parsed !== 'object' || parsed === null) throw new Error('Invalid JSON structure');
+        return parsed;
+    } catch (error) {
+        console.error('Error loading pomodoros:', error);
         return {};
     }
 }
 
 async function savePomodoros(pomodoros) {
-    await fs.writeFile(POMODORO_FILE, JSON.stringify(pomodoros, null, 2));
+    while (savingPomodoros) await new Promise(resolve => setTimeout(resolve, 100));
+    savingPomodoros = true;
+    try {
+        await fs.writeFile(POMODORO_FILE, JSON.stringify(pomodoros, null, 2));
+    } finally {
+        savingPomodoros = false;
+    }
+}
+
+async function loadCompleted() {
+    try {
+        const data = await fs.readFile(COMPLETED_FILE, 'utf8');
+        const parsed = JSON.parse(data);
+        if (typeof parsed !== 'object' || parsed === null) throw new Error('Invalid JSON structure');
+        return parsed;
+    } catch (error) {
+        console.error('Error loading completed pomodoros:', error);
+        return {};
+    }
+}
+
+async function saveCompleted(completed) {
+    while (savingCompleted) await new Promise(resolve => setTimeout(resolve, 100));
+    savingCompleted = true;
+    try {
+        await fs.writeFile(COMPLETED_FILE, JSON.stringify(completed, null, 2));
+    } finally {
+        savingCompleted = false;
+    }
 }
 
 async function fetchQuote() {
     try {
-        const response = await fetch('http://127.0.0.1:8000/frases');
+        const response = await fetch(QUOTE_API_URL);
+        if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
         const quoteData = await response.json();
         return `"${quoteData.frase}" — Motivação`;
-    } catch {
+    } catch (error) {
+        console.error('Error fetching quote:', error);
         return '"Mantenha o foco!" — Sistema';
     }
 }
-
-
 
 function calculateProgress(data) {
     let elapsedMs = data.elapsed || 0;
@@ -60,13 +99,16 @@ function createPanelEmbed(data, progress, quote, client) {
     const progressBar = '█'.repeat(filled) + '░'.repeat(barLength - filled);
 
     const red = Math.floor(255 * (1 - percent / 100));
-    const green = Math.floor(255 * percent / 100);
+    const green = Math.floor(255 * (percent / 100));
     const color = (red << 16) | (green << 8) | 0;
+
+    const safeQuote = quote.length > 200 ? quote.slice(0, quote.lastIndexOf(' ', 200)) + "..." : quote;
 
     return new EmbedBuilder()
         .setTitle('Painel Pomodoro')
-        .setDescription(`**Foco:** ${data.focus}\n**Duração:** ${data.duration} minutos\n\n**Motivação:**\n${quote}`)
+        .setDescription(`**Foco:** ${data.focus}\n**Duração:** ${data.duration} minutos`)
         .addFields(
+            { name: 'Motivação', value: safeQuote },
             { name: 'Progresso', value: `\`\`\`${progressBar}\`\`\`` },
             { name: 'Completado', value: `${percent}% (${minutesCompleted} min)`, inline: true },
             { name: 'Restante', value: `${minutesRemaining} min`, inline: true },
@@ -97,47 +139,40 @@ function createButtonRow(state) {
     );
 }
 
-const COMPLETED_FILE = './pomodoros_concluidos.json';
-
-async function loadCompleted() {
-    try {
-        const data = await fs.readFile(COMPLETED_FILE, 'utf8');
-        return JSON.parse(data);
-    } catch {
-        return {};
-    }
-}
-
-async function saveCompleted(completed) {
-    await fs.writeFile(COMPLETED_FILE, JSON.stringify(completed, null, 2));
-}
-
 async function incrementPomodoro(userId) {
     const completed = await loadCompleted();
     completed[userId] = (completed[userId] || 0) + 1;
 
-    // A cada 2 Pomodoros, adiciona 50 pontos
+    let reward = 0;
     if (completed[userId] >= 2) {
-        addPontos(userId, 50);
-        completed[userId] = 0; // reset contador
-        return 50;
+        await addPontos(userId, 50);
+        reward = 50;
+        completed[userId] = 0;
     }
     await saveCompleted(completed);
-    return 0;
+    return reward;
 }
 
+async function updateMessage(client, data, embed, components = null) {
+    try {
+        const channel = await client.channels.fetch(data.channelId);
+        const message = await channel.messages.fetch(data.messageId);
+        await message.edit({ embeds: [embed], components: components ? [components] : [] });
+    } catch (error) {
+        console.error('Error updating message:', error);
+    }
+}
 
-function startInterval(userId, message, client) {
-    return setInterval(async () => {
+function startInterval(userId, client) {
+    const intervalId = setInterval(async () => {
         let pomodoros = await loadPomodoros();
         const data = pomodoros[userId];
         if (!data || data.state !== 'active') return;
 
         const progress = calculateProgress(data);
 
-        // Se o Pomodoro estiver completo
         if (progress.percent >= 100) {
-            const reward = await incrementPomodoro(userId); // A cada 2 Pomodoros, ganha pontos
+            const reward = await incrementPomodoro(userId);
             const quote = await fetchQuote();
             const successEmbed = new EmbedBuilder()
                 .setTitle('Pomodoro Concluído')
@@ -146,122 +181,104 @@ function startInterval(userId, message, client) {
                 .setColor(0x00FF00)
                 .setFooter({ text: client.user.username, iconURL: client.user.displayAvatarURL() })
                 .setTimestamp();
-            try {
-                await message.edit({ embeds: [successEmbed], components: [] });
-            } catch (e) {
-                console.error('Error completing Pomodoro:', e);
-            }
+            await updateMessage(client, data, successEmbed);
+            stopInterval(userId);
             delete pomodoros[userId];
             await savePomodoros(pomodoros);
             return;
         }
 
-        // Atualiza o tempo decorrido
         data.elapsed = progress.elapsedMs;
         pomodoros[userId] = data;
         await savePomodoros(pomodoros);
 
-        // Atualiza o embed com progresso e motivação
         const quote = await fetchQuote();
         const updatedEmbed = createPanelEmbed(data, progress, quote, client);
-        try {
-            await message.edit({ embeds: [updatedEmbed] });
-        } catch (e) {
-            console.error('Error updating progress:', e);
-        }
+        await updateMessage(client, data, updatedEmbed);
     }, UPDATE_INTERVAL);
+    intervals.set(userId, intervalId);
+    return intervalId;
 }
 
+function stopInterval(userId) {
+    if (intervals.has(userId)) {
+        clearInterval(intervals.get(userId));
+        intervals.delete(userId);
+    }
+}
+
+// ---- Comando /pomodoro ----
 
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('pomodoro')
-        .setDescription('Inicia ou gerencia um Pomodoro personalizado (somente em DMs)')
+        .setDescription('Inicia ou gerencia um Pomodoro personalizado (somente DMs)')
         .setDMPermission(true),
 
     async execute(interaction) {
         if (interaction.guildId) {
-            return interaction.reply({ content: 'Este comando só pode ser usado em mensagens diretas (DMs)!', flags: 64 });
+            return interaction.reply({ content: 'Este comando só pode ser usado em DMs!', ephemeral: true });
         }
 
         const userId = interaction.user.id;
         const client = interaction.client;
+        if (!interaction.channel) {
+            console.error('No channel found for interaction', { interactionId: interaction.id });
+            return interaction.reply({ content: 'Erro: Canal não encontrado.', ephemeral: true });
+        }
+
         let pomodoros = await loadPomodoros();
 
-        // Handle existing Pomodoro
+        // Se já existe um Pomodoro
         if (pomodoros[userId] && pomodoros[userId].state !== 'stopped') {
             let data = pomodoros[userId];
             const progress = calculateProgress(data);
             const quote = await fetchQuote();
 
-            if (progress.percent >= 100) {
-                const successEmbed = new EmbedBuilder()
-                    .setTitle('Pomodoro Concluído')
-                    .setDescription(`Você completou seu Pomodoro focado em "${data.focus}"!\n\n**Motivação:** ${quote}`)
-                    .setColor(0x00FF00)
-                    .setFooter({ text: client.user.username, iconURL: client.user.displayAvatarURL() })
-                    .setTimestamp();
-                await interaction.reply({ embeds: [successEmbed], flags: 0 });
-                delete pomodoros[userId];
-                await savePomodoros(pomodoros);
-                return;
-            }
-
-            // Pause if active to prevent time jumps
-            if (data.state === 'active') {
-                data.elapsed += Date.now() - data.startTime;
-                data.startTime = null;
-                data.state = 'paused';
-                pomodoros[userId] = data;
-                await savePomodoros(pomodoros);
-            }
-
             const embed = createPanelEmbed(data, progress, quote, client);
             const row = createButtonRow(data.state);
-            message = await modalSubmit.reply({ embeds: [embed], components: [row], flags: 0 });
+            const message = await interaction.reply({ embeds: [embed], components: [row], fetchReply: true });
 
-
+            data.channelId = interaction.channel.id;
             data.messageId = message.id;
-            data.channelId = message.channel.id;
             pomodoros[userId] = data;
             await savePomodoros(pomodoros);
 
-            let interval;
-            if (data.state === 'active') {
-                interval = startInterval(userId, message, client);
-            }
+            let intervalId;
+            if (data.state === 'active') intervalId = startInterval(userId, client);
 
-            const collector = message.createMessageComponentCollector({ componentType: ComponentType.Button });
+            const collector = message.createMessageComponentCollector({
+                componentType: ComponentType.Button,
+                time: 24 * 60 * 60 * 1000 // 24 horas
+            });
 
             collector.on('collect', async i => {
-                if (i.user.id !== userId) {
-                    return i.reply({ content: 'Somente você pode controlar este Pomodoro!', flags: 64 });
-                }
-
-                let data = pomodoros[userId];
+                if (!i.user || i.user.id !== userId) return i.reply({ content: 'Somente você pode controlar este Pomodoro!', ephemeral: true });
+                data = pomodoros[userId];
                 if (!data) return;
 
                 const progress = calculateProgress(data);
                 const quote = await fetchQuote();
 
                 if (i.customId === 'startPomodoro') {
-                    if (data.state === 'active') return;
-                    data.state = 'active';
-                    data.startTime = Date.now();
-                    interval = startInterval(userId, message, client);
+                    if (data.state !== 'active') {
+                        data.state = 'active';
+                        data.startTime = Date.now();
+                        intervalId = startInterval(userId, client);
+                    }
                 } else if (i.customId === 'pausePomodoro') {
                     if (data.state === 'active') {
                         data.elapsed += Date.now() - data.startTime;
                         data.startTime = null;
                         data.state = 'paused';
-                        clearInterval(interval);
+                        stopInterval(userId);
                     } else if (data.state === 'paused') {
-                        data.startTime = Date.now();
                         data.state = 'active';
-                        interval = startInterval(userId, message, client);
+                        data.startTime = Date.now();
+                        intervalId = startInterval(userId, client);
                     }
                 } else if (i.customId === 'stopPomodoro') {
-                    if (interval) clearInterval(interval);
+                    stopInterval(userId);
                     data.state = 'stopped';
                     const stopEmbed = new EmbedBuilder()
                         .setTitle('Pomodoro Parado')
@@ -283,14 +300,17 @@ module.exports = {
                 await i.update({ embeds: [updatedEmbed], components: [updatedRow] });
             });
 
-            collector.on('end', () => {
-                if (interval) clearInterval(interval);
+            collector.on('end', (collected, reason) => {
+                stopInterval(userId);
+                if (reason === 'time' && pomodoros[userId]) {
+                    delete pomodoros[userId];
+                    savePomodoros(pomodoros);
+                }
             });
-
             return;
         }
 
-        // Show modal for new Pomodoro
+        // Cria modal para novo Pomodoro
         const modal = new ModalBuilder()
             .setCustomId('pomodoroModal')
             .setTitle('Seu Pomodoro Perfeito');
@@ -314,116 +334,116 @@ module.exports = {
 
         await interaction.showModal(modal);
 
-        let modalSubmit;
         try {
-            modalSubmit = await interaction.awaitModalSubmit({
-                filter: i => i.customId === 'pomodoroModal' && i.user.id === userId,
-                time: 300000 // 5 minutes
+            const modalSubmit = await interaction.awaitModalSubmit({
+                filter: i => {
+                    try {
+                        return i.customId === 'pomodoroModal' && i.user && i.user.id === userId;
+                    } catch {
+                        return false;
+                    }
+                },
+                time: 300000
             });
-        } catch (e) {
-            console.error('Error awaiting modal submit:', e);
-            return;
-        }
 
-        const focus = modalSubmit.fields.getTextInputValue('focusInput');
-        const durationStr = modalSubmit.fields.getTextInputValue('durationInput');
-        const duration = parseInt(durationStr);
+            const focus = modalSubmit.fields.getTextInputValue('focusInput');
+            const durationStr = modalSubmit.fields.getTextInputValue('durationInput');
+            const duration = parseInt(durationStr);
 
-        if (isNaN(duration) || duration <= 0) {
-            return modalSubmit.reply({ content: 'Duração inválida! Deve ser um número positivo.', flags: 64 });
-        }
-
-        let channelId;
-        try {
-            channelId = modalSubmit.channel?.id || (await modalSubmit.user.createDM()).id;
-            if (!channelId) throw new Error('Failed to obtain channel ID');
-        } catch (e) {
-            console.error('Error getting DM channel:', e);
-            return modalSubmit.reply({ content: 'Não foi possível acessar o canal de DM!', flags: 64 });
-        }
-
-        const data = {
-            focus,
-            duration,
-            elapsed: 0,
-            state: 'inactive',
-            startTime: null,
-            channelId,
-            messageId: null
-        };
-        pomodoros[userId] = data;
-        await savePomodoros(pomodoros);
-
-        const quote = await fetchQuote();
-        const embed = createPanelEmbed(data, { percent: 0, minutesCompleted: 0, minutesRemaining: duration }, quote, client);
-        const row = createButtonRow(data.state);
-        let message;
-        try {
-            message = await modalSubmit.reply({ embeds: [embed], components: [row], flags: 0 });
-        } catch (e) {
-            console.error('Error sending modal reply:', e);
-            return;
-        }
-
-        data.messageId = message.id;
-        pomodoros[userId] = data;
-        await savePomodoros(pomodoros);
-
-        let interval;
-        const collector = message.createMessageComponentCollector({ componentType: ComponentType.Button });
-
-        collector.on('collect', async i => {
-            if (i.user.id !== userId) {
-                return i.reply({ content: 'Somente você pode controlar este Pomodoro!', flags: 64 });
+            if (isNaN(duration) || duration <= 0 || duration > 120) {
+                return modalSubmit.reply({ content: 'Duração inválida! Deve ser entre 1 e 120 minutos.', ephemeral: true });
             }
 
-            let data = pomodoros[userId];
-            if (!data) return;
-
-            const progress = calculateProgress(data);
-            const quote = await fetchQuote();
-
-            if (i.customId === 'startPomodoro') {
-                if (data.state === 'active') return;
-                data.state = 'active';
-                data.startTime = Date.now();
-                interval = startInterval(userId, message, client);
-            } else if (i.customId === 'pausePomodoro') {
-                if (data.state === 'active') {
-                    data.elapsed += Date.now() - data.startTime;
-                    data.startTime = null;
-                    data.state = 'paused';
-                    clearInterval(interval);
-                } else if (data.state === 'paused') {
-                    data.startTime = Date.now();
-                    data.state = 'active';
-                    interval = startInterval(userId, message, client);
-                }
-            } else if (i.customId === 'stopPomodoro') {
-                if (interval) clearInterval(interval);
-                data.state = 'stopped';
-                const stopEmbed = new EmbedBuilder()
-                    .setTitle('Pomodoro Parado')
-                    .setDescription(`Seu Pomodoro foi interrompido.\n\n**Motivação:** ${quote}`)
-                    .setColor(0xFF0000)
-                    .setFooter({ text: client.user.username, iconURL: client.user.displayAvatarURL() })
-                    .setTimestamp();
-                await i.update({ embeds: [stopEmbed], components: [] });
-                delete pomodoros[userId];
-                await savePomodoros(pomodoros);
-                collector.stop();
-                return;
-            }
-
+            // Cria objeto Pomodoro
+            const data = { focus, duration, elapsed: 0, state: 'inactive', startTime: null, channelId: modalSubmit.channel.id, messageId: null };
             pomodoros[userId] = data;
             await savePomodoros(pomodoros);
-            const updatedEmbed = createPanelEmbed(data, progress, quote, client);
-            const updatedRow = createButtonRow(data.state);
-            await i.update({ embeds: [updatedEmbed], components: [updatedRow] });
-        });
 
-        collector.on('end', () => {
-            if (interval) clearInterval(interval);
-        });
+            const quote = await fetchQuote();
+            const embed = createPanelEmbed(data, { percent: 0, minutesCompleted: 0, minutesRemaining: duration, elapsedMs: 0 }, quote, client);
+            const row = createButtonRow(data.state);
+
+            const message = await modalSubmit.reply({ embeds: [embed], components: [row], fetchReply: true });
+            data.messageId = message.id;
+            pomodoros[userId] = data;
+            await savePomodoros(pomodoros);
+
+            // Botões do novo Pomodoro
+            let intervalId;
+            const collector = message.createMessageComponentCollector({
+                componentType: ComponentType.Button,
+                time: 24 * 60 * 60 * 1000 // 24 horas
+            });
+
+            collector.on('collect', async i => {
+                if (!i.user || i.user.id !== userId) return i.reply({ content: 'Somente você pode controlar este Pomodoro!', ephemeral: true });
+                let data = pomodoros[userId];
+                if (!data) return;
+
+                const progress = calculateProgress(data);
+                const quote = await fetchQuote();
+
+                if (i.customId === 'startPomodoro') {
+                    if (data.state !== 'active') {
+                        data.state = 'active';
+                        data.startTime = Date.now();
+                        intervalId = startInterval(userId, client);
+                    }
+                } else if (i.customId === 'pausePomodoro') {
+                    if (data.state === 'active') {
+                        data.elapsed += Date.now() - data.startTime;
+                        data.startTime = null;
+                        data.state = 'paused';
+                        stopInterval(userId);
+                    } else if (data.state === 'paused') {
+                        data.state = 'active';
+                        data.startTime = Date.now();
+                        intervalId = startInterval(userId, client);
+                    }
+                } else if (i.customId === 'stopPomodoro') {
+                    stopInterval(userId);
+                    data.state = 'stopped';
+                    const stopEmbed = new EmbedBuilder()
+                        .setTitle('Pomodoro Parado')
+                        .setDescription(`Seu Pomodoro foi interrompido.\n\n**Motivação:** ${quote}`)
+                        .setColor(0xFF0000)
+                        .setFooter({ text: client.user.username, iconURL: client.user.displayAvatarURL() })
+                        .setTimestamp();
+                    await i.update({ embeds: [stopEmbed], components: [] });
+                    delete pomodoros[userId];
+                    await savePomodoros(pomodoros);
+                    collector.stop();
+                    return;
+                }
+
+                pomodoros[userId] = data;
+                await savePomodoros(pomodoros);
+                const updatedEmbed = createPanelEmbed(data, progress, quote, client);
+                const updatedRow = createButtonRow(data.state);
+                await i.update({ embeds: [updatedEmbed], components: [updatedRow] });
+            });
+
+            collector.on('end', (collected, reason) => {
+                stopInterval(userId);
+                if (reason === 'time' && pomodoros[userId]) {
+                    delete pomodoros[userId];
+                    savePomodoros(pomodoros);
+                }
+            });
+
+        } catch (e) {
+            if (e.message.includes('time') || e.message.includes('timeout')) {
+                return; // Ignora timeout do modal
+            }
+            console.error('Erro aguardando submit do modal:', {
+                error: e.message,
+                stack: e.stack,
+                userId,
+                interactionId: interaction.id
+            });
+            if (!interaction.replied && !interaction.deferred) {
+                await interaction.followUp({ content: 'Erro ao processar o Pomodoro. Tente novamente.', ephemeral: true }).catch(() => {});
+            }
+        }
     }
 };
