@@ -43,7 +43,7 @@ function addPomodoro(userId) {
     return { totalPontos: data[userId].pontos, pontosGanhados };
 }
 
-// ✅ Função que retorna todos os usuários e pontos
+// Função que retorna todos os usuários e pontos
 function getTodosPontos() {
     const data = loadPontos();
     return Object.entries(data).map(([userId, info]) => ({
@@ -52,7 +52,7 @@ function getTodosPontos() {
     }));
 }
 
-// ✅ Função que gera/atualiza rankuser.json com top 5
+// Função que gera/atualiza rankuser.json com top 5
 function atualizarRankJSON() {
     const todos = getTodosPontos()
         .sort((a, b) => b.pontos - a.pontos) // maior para menor

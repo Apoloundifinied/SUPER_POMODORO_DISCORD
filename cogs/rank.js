@@ -8,18 +8,15 @@ module.exports = {
     data: new SlashCommandBuilder()
         .setName('rank')
         .setDescription('Mostra o ranking dos top 5 usuários (somente DM)')
-        .setDMPermission(true), // Permite apenas DM
+        .setDMPermission(true),
 
     async execute(interaction) {
-        // Bloqueia uso em guilds
         if (interaction.guildId) {
             return interaction.reply({
                 content: 'Este comando só pode ser usado em mensagens diretas (DMs)!',
                 ephemeral: true
             });
         }
-
-        // Lê o ranking do JSON
         if (!fs.existsSync(RANK_FILE)) {
             return interaction.reply({
                 content: 'Nenhum ranking disponível no momento.',
@@ -36,7 +33,8 @@ module.exports = {
             });
         }
 
-        // Monta a mensagem do top 5
+
+
         const rankingMsg = ranking.map((user, index) => {
             return `#${index + 1} <@${user.userId}> - ${user.pontos} pontos`;
         }).join('\n');
