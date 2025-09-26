@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, Collection, REST, Routes } = require('discord.js');
+const { Client, GatewayIntentBits, Collection, REST, Routes, Partials } = require('discord.js');
 const { readdirSync } = require('fs');
 const { join } = require('path');
 const { addPontos } = require('./cogs/utils/pontos');
@@ -13,7 +13,7 @@ const client = new Client({
         GatewayIntentBits.MessageContent,
         GatewayIntentBits.DirectMessageReactions
     ],
-    partials: ['MESSAGE', 'CHANNEL', 'REACTION', 'USER', 'GUILD_MEMBER']
+    partials: [Partials.Message, Partials.Channel, Partials.Reaction, Partials.User, Partials.GuildMember]
 });
 
 client.commands = new Collection();
@@ -53,7 +53,7 @@ const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
     }
 })();
 
-client.once('ready', () => {
+client.once('clientReady', () => {
     console.log(`Bot conectado como ${client.user.tag}`);
 });
 
@@ -69,7 +69,7 @@ client.on('interactionCreate', async interaction => {
 
         // Somente defer comandos de guild que não são pontos/pomodoro/rank
         if (isGuild && !['pomodoro', 'pontos', 'rank'].includes(command.data.name) && !interaction.replied && !interaction.deferred) {
-            await interaction.deferReply({ ephemeral: true });
+            await interaction.deferReply({ flags: 64 });
         }
 
         await command.execute(interaction);
@@ -79,17 +79,22 @@ client.on('interactionCreate', async interaction => {
             const total = addPontos(interaction.user.id, 50);
             await interaction.followUp({
                 content: `🎉 Você ganhou **50 pontos**! Total: **${total} pontos**.`,
-                ephemeral: true
+                flags: 64 // Ephemeral using flags
             });
         }
 
     } catch (err) {
-        console.error('Erro ao executar comando:', err);
+        console.error('Erro ao executar comando:', {
+            error: err.message,
+            stack: err.stack,
+            command: interaction.commandName,
+            interactionId: interaction.id
+        });
 
         if (!interaction.replied && !interaction.deferred) {
-            await interaction.reply({ content: 'Ocorreu um erro ao executar esse comando!', ephemeral: true });
+            await interaction.reply({ content: 'Ocorreu um erro ao executar esse comando!', flags: 64 }).catch(() => {});
         } else if (interaction.deferred) {
-            await interaction.editReply({ content: 'Ocorreu um erro ao executar esse comando!' });
+            await interaction.editReply({ content: 'Ocorreu um erro ao executar esse comando!' }).catch(() => {});
         }
     }
 });
