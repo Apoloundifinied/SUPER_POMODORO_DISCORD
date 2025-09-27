@@ -1,61 +1,43 @@
 const fs = require('fs');
 const path = require('path');
 
-const pontosPath = path.join(__dirname, 'pontos.json');
+const RECOMPENSAS_PATH = path.join(__dirname, '..', 'db', 'recompensas.json');
+const PONTOS_PATH = path.join(__dirname, '..', 'db', 'pontos.json');
 
-// Carrega pontos.json
+function carregarRecompensas() {
+  if (!fs.existsSync(RECOMPENSAS_PATH)) return { loja: [] };
+  return JSON.parse(fs.readFileSync(RECOMPENSAS_PATH, 'utf8'));
+}
+
 function carregarPontos() {
-  if (!fs.existsSync(pontosPath)) return { usuarios: {} };
-  return JSON.parse(fs.readFileSync(pontosPath));
+  if (!fs.existsSync(PONTOS_PATH)) return {};
+  return JSON.parse(fs.readFileSync(PONTOS_PATH, 'utf8'));
 }
 
-// Mostra a loja
-function mostrarLoja(Loja) {
-  console.log("🛒 Loja Pomodoro 🛒");
-  Loja.forEach((item, index) => {
-    console.log(`${index + 1} - ${item.nome} | ${item.preco} pontos | ${item.descricao}`);
-  });
-}
-
-// Loja fixa
-const data = {
-  Loja: [
-    { nome: "Pausa Extra", preco: 50, descricao: "Ganha 5 minutos de pausa extra." },
-    { nome: "Tema Escuro", preco: 100, descricao: "Desbloqueia o tema escuro no app." }
-  ]
-};
-
-
-
-function comprarItem(usuario, itemIndex) {
-  const item = data.Loja[itemIndex];
-  if (!item) return console.log("❌ Item não existe!");
-
-  if (usuario.pontos >= item.preco) {
-    usuario.pontos -= item.preco;
-
-    if (!usuario.itens) usuario.itens = [];
-    usuario.itens.push(item.nome);
-
-    console.log(`✅ Você comprou: ${item.nome}`);
-  } else {
-    console.log("❌ Saldo insuficiente");
-  }
-}
-
-
-// Salvar alterações
 function salvarPontos(dados) {
-  fs.writeFileSync(pontosPath, JSON.stringify(dados, null, 2));
+  fs.writeFileSync(PONTOS_PATH, JSON.stringify(dados, null, 2), 'utf8');
 }
 
-// ----------------- TESTE -----------------
-let pontos = carregarPontos();
-let usuario = pontos["929506957063241738"]; // 👈 pega pelo ID
+function listarLoja() {
+  const dados = carregarRecompensas();
+  return dados.loja || [];
+}
 
-mostrarLoja(data.Loja);
-comprarItem(usuario, 0); // compra o item 0 (Pausa Extra)
-salvarPontos(pontos);
+function comprar(userId, itemId) {
+  const loja = listarLoja();
+  const item = loja.find(i => i.id === itemId || i.nome.toLowerCase() === itemId.toLowerCase());
+  if (!item) return { ok: false, reason: 'not_found' };
 
-console.log("Novo saldo:", usuario.pontos);
-console.log("Itens:", usuario.itens);
+  const pontos = carregarPontos();
+  pontos[userId] = pontos[userId] || { pontos: 0, pomodorosConcluidos: 0, itens: [] };
+  if ((pontos[userId].pontos || 0) < item.preco) return { ok: false, reason: 'insufficient' };
+
+  pontos[userId].pontos -= item.preco;
+  pontos[userId].itens = pontos[userId].itens || [];
+  pontos[userId].itens.push(item.nome);
+  salvarPontos(pontos);
+
+  return { ok: true, item };
+}
+
+module.exports = { listarLoja, comprar, carregarPontos, salvarPontos, carregarRecompensas };

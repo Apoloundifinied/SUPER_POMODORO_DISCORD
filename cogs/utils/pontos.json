@@ -1,13 +1,6 @@
 {
-  "929506957063241738": {
-    "pontos": 450,
-    "pomodorosConcluidos": 0,
-    "itens": [
-      "Pausa Extra"
-    ]
-  },
-  "1232112188609794069": {
-    "pontos": 150,
+  "test-user-1": {
+    "pontos": 50,
     "pomodorosConcluidos": 0
   }
 }

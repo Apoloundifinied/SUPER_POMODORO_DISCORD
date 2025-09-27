@@ -1,0 +1,81 @@
+:root{
+	--bg:#0b0f19;
+	--card:#0f1724;
+	--muted:#9aa4b2;
+	--accent:#7c3aed;
+	--accent-2:#06b6d4;
+	--glass: rgba(255,255,255,0.04);
+}
+
+*{box-sizing:border-box}
+html,body,#app{height:100%}
+body.app-root{background:linear-gradient(180deg,var(--bg),#06070a);color:#e6eef8;font-family:Inter,system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial}
+
+/* LAYOUT */
+.sidebar{width:280px;background:var(--card);border-right:1px solid rgba(255,255,255,0.03);display:flex;flex-direction:column}
+.sidebar-header{padding:24px;border-bottom:1px solid rgba(255,255,255,0.03)}
+.sidebar-header h1{font-size:18px;margin:0}
+.sidebar-header p{color:var(--muted);margin-top:6px;font-size:13px}
+.sidebar-nav{padding:12px 16px;display:flex;flex-direction:column;gap:6px}
+.nav-btn{background:transparent;border:none;color:inherit;padding:10px;border-radius:8px;text-align:left;cursor:pointer;transition:background .18s ease}
+.nav-btn:hover{background:rgba(255,255,255,0.03)}
+.sidebar-footer{padding:14px 16px;color:var(--muted);font-size:12px;border-top:1px solid rgba(255,255,255,0.03)}
+
+.main-content{flex:1;padding:28px;overflow:auto}
+.main-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
+.main-header h2{margin:0;font-size:22px}
+.lead{color:var(--muted);margin:4px 0 0}
+
+.token-box{display:flex;gap:8px;align-items:center}
+.token-label{font-size:12px;color:var(--muted);margin-right:8px}
+.token-input{padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.06);background:transparent;color:inherit;min-width:280px}
+.token-input:focus{outline:none;box-shadow:0 6px 18px rgba(124,58,237,0.12);border-color:var(--accent)}
+.btn{padding:8px 12px;border-radius:8px;border:none;cursor:pointer}
+.btn-ghost{background:transparent;color:var(--muted);border:1px solid rgba(255,255,255,0.03)}
+.btn-primary{background:var(--accent);color:#05060a}
+.mobile-toggle{display:none}
+
+/* GRID */
+.layout-grid{display:grid;grid-template-columns:2fr 1fr;gap:20px}
+.card{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));padding:18px;border-radius:12px;border:1px solid rgba(255,255,255,0.03);box-shadow:0 6px 18px rgba(2,6,23,0.6)}
+.card h3{margin:0 0 6px}
+.card-store{min-height:220px}
+.loja-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+.store-card{padding:12px;border-radius:10px;background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));border:1px solid rgba(255,255,255,0.03);transition:transform .18s ease,box-shadow .18s ease}
+.store-card:hover{transform:translateY(-6px);box-shadow:0 12px 30px rgba(124,58,237,0.08)}
+.store-card .price{font-weight:700;color:var(--accent)}
+.store-card .desc{color:var(--muted);font-size:13px;margin-top:8px}
+.store-card .btn-buy{background:linear-gradient(90deg,var(--accent),var(--accent-2));border:none;color:#fff;padding:8px 10px;border-radius:8px;cursor:pointer}
+.store-card .btn-buy:hover{opacity:0.95}
+
+/* Stats */
+.stats-list{color:var(--muted)}
+
+/* Purchases table */
+.purchases-table .row{display:grid;grid-template-columns:40px 220px 1fr 160px 80px 120px;gap:8px;padding:10px;border-top:1px solid rgba(255,255,255,0.02);align-items:center}
+.purchases-table .row:first-child{border-top:none}
+.purchases-table .row:hover{background:rgba(255,255,255,0.01)}
+.purchases-table .small{font-size:13px;color:var(--muted)}
+.btn-refund{background:linear-gradient(90deg,#ff4154,#ff6b7a);color:#fff;border:none;padding:8px 10px;border-radius:8px}
+
+/* Modal */
+#modal{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(2,6,23,0.6);backdrop-filter:blur(4px);opacity:0;transform:translateY(-8px);pointer-events:none;transition:opacity .22s ease,transform .22s ease}
+#modal.flex{opacity:1;transform:translateY(0);pointer-events:auto}
+#modal .modal-card{background:linear-gradient(180deg, #0f1724, #0b1220);padding:18px;border-radius:12px;width:100%;max-width:720px;border:1px solid rgba(255,255,255,0.03)}
+
+/* Toast */
+#toast{position:fixed;right:20px;bottom:20px;z-index:1000}
+#toast > div{padding:10px 14px;border-radius:10px;background:#081127;color:#fff;box-shadow:0 8px 20px rgba(2,6,23,0.6)}
+
+/* Cursor trail: dots (handled by JS) */
+.cursor-dot{position:fixed;width:10px;height:10px;border-radius:50%;pointer-events:none;z-index:9999;transform:translate(-50%,-50%);mix-blend-mode:screen}
+
+/* Responsividade */
+@media(max-width:880px){
+	.sidebar{display:none}
+	.mobile-toggle{display:inline-block}
+	.layout-grid{grid-template-columns:1fr}
+	.loja-grid{grid-template-columns:1fr}
+}
+
+

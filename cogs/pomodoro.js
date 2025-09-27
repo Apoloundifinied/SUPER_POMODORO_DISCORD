@@ -15,7 +15,7 @@ const { addPontos } = require('./utils/pontos');
 
 const POMODORO_FILE = './pomodoros.json';
 const COMPLETED_FILE = './pomodoros_concluidos.json';
-const UPDATE_INTERVAL = 30 * 1000; // 30 segundos
+const UPDATE_INTERVAL = 30 * 1000; 
 const QUOTE_API_URL = process.env.QUOTE_API_URL || 'http://127.0.0.1:8000/frases';
 
 const intervals = new Map();
@@ -229,7 +229,7 @@ module.exports = {
 
         let pomodoros = await loadPomodoros();
 
-        // Se já existe um Pomodoro
+
         if (pomodoros[userId] && pomodoros[userId].state !== 'stopped') {
             let data = pomodoros[userId];
             const progress = calculateProgress(data);
@@ -249,7 +249,7 @@ module.exports = {
 
             const collector = message.createMessageComponentCollector({
                 componentType: ComponentType.Button,
-                time: 24 * 60 * 60 * 1000 // 24 horas
+                time: 24 * 60 * 60 * 1000 
             });
 
             collector.on('collect', async i => {
@@ -310,7 +310,7 @@ module.exports = {
             return;
         }
 
-        // Cria modal para novo Pomodoro
+        
         const modal = new ModalBuilder()
             .setCustomId('pomodoroModal')
             .setTitle('Seu Pomodoro Perfeito');
@@ -368,11 +368,11 @@ module.exports = {
             pomodoros[userId] = data;
             await savePomodoros(pomodoros);
 
-            // Botões do novo Pomodoro
+           
             let intervalId;
             const collector = message.createMessageComponentCollector({
                 componentType: ComponentType.Button,
-                time: 24 * 60 * 60 * 1000 // 24 horas
+                time: 24 * 60 * 60 * 1000 
             });
 
             collector.on('collect', async i => {
@@ -433,7 +433,7 @@ module.exports = {
 
         } catch (e) {
             if (e.message.includes('time') || e.message.includes('timeout')) {
-                return; // Ignora timeout do modal
+                return;
             }
             console.error('Erro aguardando submit do modal:', {
                 error: e.message,

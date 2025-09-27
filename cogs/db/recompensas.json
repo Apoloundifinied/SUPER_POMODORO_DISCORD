@@ -1,0 +1,76 @@
+{
+  "loja": [
+    {
+      "id": "pausa_extra",
+      "nome": "Pausa Extra",
+      "preco": 50,
+      "descricao": "Ganha 5 minutos de pausa extra utilizável no pomodoro.",
+      "tipo": "utilitario",
+      "emoji": "⏸️"
+    },
+    {
+      "id": "tema_escuro",
+      "nome": "Tema Escuro",
+      "preco": 100,
+      "descricao": "Desbloqueia o tema escuro no app (cosmético).",
+      "tipo": "cosmetico",
+      "emoji": "🌑"
+    },
+    {
+      "id": "role_motivador",
+      "nome": "Role: Motivador",
+      "preco": 300,
+      "descricao": "Role especial no servidor para usuários motivadores (exemplo).",
+      "tipo": "role",
+      "emoji": "🔥"
+    },
+    {
+      "id": "tempo_focado",
+      "nome": "Timer Premium",
+      "preco": 400,
+      "descricao": "Desbloqueia um timer premium com notificações extras.",
+      "tipo": "utilitario",
+      "emoji": "⏱️"
+    },
+    {
+      "id": "insignia_ouro",
+      "nome": "Insígnia Ouro",
+      "preco": 1000,
+      "descricao": "Insígnia dourada para exibir no perfil (nível máximo).",
+      "tipo": "insignia",
+      "emoji": "🥇"
+    },
+    {
+      "id": "nome_personalizado",
+      "nome": "Nome Personalizado",
+      "preco": 750,
+      "descricao": "Permite alterar o nickname por 24h (admin aprovar dependendo do servidor).",
+      "tipo": "cosmetico",
+      "emoji": "✏️"
+    },
+    {
+      "id": "pacote_boost",
+      "nome": "Pacote Boost",
+      "preco": 500,
+      "descricao": "Gera 3 pausas extras e 1 tema temporário.",
+      "tipo": "combinado",
+      "emoji": "🚀"
+    },
+    {
+      "id": "insignia_prata",
+      "nome": "Insígnia Prata",
+      "preco": 400,
+      "descricao": "Insígnia prateada para exibir no perfil (nível intermediário).",
+      "tipo": "insignia",
+      "emoji": "🥈"
+    },
+    {
+      "id": "insignia_bronze",
+      "nome": "Insígnia Bronze",
+      "preco": 200,
+      "descricao": "Insígnia bronze para novos membros ativos.",
+      "tipo": "insignia",
+      "emoji": "🥉"
+    }
+  ]
+}

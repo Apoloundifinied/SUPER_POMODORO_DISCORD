@@ -18,7 +18,7 @@ const client = new Client({
 
 client.commands = new Collection();
 
-// ===== CARREGAR COMANDOS =====
+//CARREGAR COMANDOS 
 const commandsPath = join(__dirname, 'cogs');
 const commandFiles = readdirSync(commandsPath).filter(file => file.endsWith('.js') && file !== 'utils');
 
@@ -69,7 +69,7 @@ client.on('interactionCreate', async interaction => {
 
         // Somente defer comandos de guild que não são pontos/pomodoro/rank
         if (isGuild && !['pomodoro', 'pontos', 'rank'].includes(command.data.name) && !interaction.replied && !interaction.deferred) {
-            await interaction.deferReply({ flags: 64 }); // Ephemeral using flags
+            await interaction.deferReply({ flags: 64 });
         }
 
         await command.execute(interaction);
@@ -79,7 +79,7 @@ client.on('interactionCreate', async interaction => {
             const total = addPontos(interaction.user.id, 50);
             await interaction.followUp({
                 content: `🎉 Você ganhou **50 pontos**! Total: **${total} pontos**.`,
-                flags: 64 // Ephemeral using flags
+                flags: 64 
             });
         }
 
