@@ -1,3 +1,4 @@
+
 const { Client, GatewayIntentBits, Collection, REST, Routes, Partials } = require('discord.js');
 const { readdirSync } = require('fs');
 const { join } = require('path');
